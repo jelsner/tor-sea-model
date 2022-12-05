@@ -1,0 +1,81 @@
+---
+title: "Seasonal tornado model"
+output: html_document
+date: "2022-12-03"
+---
+
+Download the data and put it into the folder called `data`
+
+```{r}
+loc <- "http://www.spc.noaa.gov/gis/svrgis/zipped/1950-2021-torn-aspath.zip"
+
+download.file(url = loc,
+              destfile = here::here("data", "1950-2021-torn-aspath.zip"))
+
+unzip(zipfile = here::here("data", "1950-2021-torn-aspath.zip"), 
+      exdir = here::here("data"))
+```
+
+Get the data into your R session
+
+```{r}
+Torn.sf <- sf::st_read(dsn = here::here("data", "1950-2021-torn-aspath"), 
+                       layer = "1950-2021-torn-aspath") 
+
+Torn.sf |>
+  str()
+```
+
+Filter and augment the data frame. Make sure to center the variables.
+
+```{r}
+Counts.df <- Torn.sf |>
+  sf::st_drop_geometry() |>
+  dplyr::filter(yr >= 1992,
+                mag >= 0) |>
+  dplyr::mutate(Date = lubridate::as_date(date),
+                Month = lubridate::month(Date),
+                Year = lubridate::year(Date),
+                DoY = lubridate::yday(Date),
+                YearC = Year - 2006,
+                MonthC = Month - 6,
+                DoYC = DoY - 182) |>
+  dplyr::group_by(YearC, DoYC) |>
+  dplyr::summarise(nT = dplyr::n())
+```
+
+Model
+
+```{r}
+f <- nT ~ YearC * DoYC
+
+fit0 <- brms::brm(f, data = Counts.df, 
+                  family = negbinomial(link = "log", 
+                                       link_shape = "log"))
+
+pp_check(fit0)
+```
+
+Model the cumulative distribution directly (see Example 3: Insured loss payments https://cran.microsoft.com/snapshot/2022-02-20/web/packages/brms/vignettes/brms_multilevel.pdf)
+
+```{r}
+Counts.df <- Torn.sf |>
+  sf::st_drop_geometry() |>
+  dplyr::filter(yr >= 1992,
+                mag >= 0) |>
+  dplyr::mutate(Date = lubridate::as_date(date),
+                Month = lubridate::month(Date),
+                Year = lubridate::year(Date),
+                DoY = lubridate::yday(Date),
+                YearC = Year - 2006,
+                DoYF = as.factor(DoY)) |>
+  dplyr::group_by(YearC, DoYF, .drop = FALSE) |>
+  dplyr::summarise(nT = dplyr::n()) |>
+  dplyr::group_by(YearC) |>
+  dplyr::mutate(cum = cumsum(nT),
+                nT = nT)
+```
+
+```{r}
+
+```
