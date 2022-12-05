@@ -26,7 +26,7 @@ Torn.sf |>
   str()
 ```
 
-Filter and augment the data frame. Make sure to center the variables.
+Filter and augment the data frame. Make sure to center the variables
 
 ```{r}
 Counts.df <- Torn.sf |>
