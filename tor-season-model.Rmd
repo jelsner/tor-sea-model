@@ -66,16 +66,73 @@ Counts.df <- Torn.sf |>
   dplyr::mutate(Date = lubridate::as_date(date),
                 Month = lubridate::month(Date),
                 Year = lubridate::year(Date),
-                DoY = lubridate::yday(Date),
+                D = lubridate::yday(Date),
                 YearC = Year - 2006,
-                DoYF = as.factor(DoY)) |>
-  dplyr::group_by(YearC, DoYF, .drop = FALSE) |>
+                DF = as.factor(D)) |>
+  dplyr::group_by(Year, D, .drop = FALSE) |>
   dplyr::summarise(nT = dplyr::n()) |>
-  dplyr::group_by(YearC) |>
-  dplyr::mutate(cum = cumsum(nT),
-                nT = nT)
+  dplyr::group_by(Year) |>
+  dplyr::mutate(C = cumsum(nT),
+                nT = nT,
+                TY = dplyr::last(C))
+```
+
+Here I model the cumulative number of tornadoes starting on January 1st for different years. The model is:
+
+$$
+\hbox{C}_{Y,D} \sim N(\mu_{Y,D}, \sigma) \\
+\mu_{Y,D} = \hbox{T}_{Y} \Big(1 - \exp\Big(-\Big(\frac{D}{\theta}\Big)^\omega \Big) \Big)
+$$
+
+The cumulative number of tornadoes C will increase over time D. Further, $\hbox{T}_{Y}$ is the (to be estimated) total number of tornadoes each year. It constitutes a parameter in the framework along with the parameters θ and ω, which are responsible for the increase in tornado activity and are assumed to be the same across years.
+
+The corresponding {brms} model is as follows.
+
+```{r}
+library(brms)
+
+nlform <- bf( C ~ TY * (1 - exp(-(D / theta)^omega)),
+             TY ~ 1 + (1 | Year), 
+             omega ~ 1, 
+             theta ~ 1, 
+             nl = TRUE)
+
+nlprior <- c(prior(normal(1000, 1000), 
+                   nlpar = "TY"),
+             prior(normal(1, 2), 
+                   nlpar = "omega"),
+             prior(normal(45, 10), 
+                   nlpar = "theta"))
+```
+
+Fit the model
+
+```{r}
+fit0 <- brm(formula = nlform, 
+            data = Counts.df, 
+            family = gaussian(),
+            prior = nlprior, 
+            control = list(adapt_delta = .9))
 ```
 
 ```{r}
+conditional_effects(fit0)
+```
 
+We can also visualize the cumulative number of tornadoes separately for each year.
+
+```{r}
+
+conditions <- data.frame(Year = unique(Counts.df$Year))
+rownames(conditions) <- unique(Counts.df$Year)
+
+conditions <- conditions |>
+  dplyr::filter(Year >= 2012)
+
+me_year <- conditional_effects(fit0, 
+                               conditions = conditions,
+                               re_formula = NULL, 
+                               method = "predict")
+
+plot(me_year, ncol = 5, points = TRUE)
 ```
