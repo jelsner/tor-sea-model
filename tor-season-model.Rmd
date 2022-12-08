@@ -136,3 +136,66 @@ me_year <- conditional_effects(fit0,
 
 plot(me_year, ncol = 5, points = TRUE)
 ```
+
+Double sigmoidal
+$$
+y = \frac{1}{2}\Big(\tanh\big(\frac{x-c_1}{w_1}\big) + \tanh\big(\frac{x-c_2}{w_2}\big)\Big)
+$$
+```{r}
+x <- 1:365
+c1 <- 0
+w1 <- 100
+c2 <- 300
+w2 <- 100
+TY <- 1000
+y <- .5 * (tanh((x-c1)/w1) + tanh((x-c2)/w2))
+plot(x, y)
+```
+
+```{r}
+x <- 1:365
+theta1 <- 100 # where in time the inflection point occurs
+omega1 <- 5
+theta2 <- 300
+omega2 <- 20
+p <- .75
+TY <- 1000
+y <- TY * (p * (1 - exp(-(x / theta1)^omega1)) + 
+          (1 - p) * (1 - exp(-(x / theta2)^omega2)))
+plot(x, y)
+```
+```{r}
+form <- bf( C ~ TY * (p * (1 - exp(-(D / theta1)^omega1)) + 
+                     ((1-p) * (1 - exp(-(D / theta2)^omega2)))),
+             TY ~ 1 + (1 | Year), 
+             omega1 ~ 1, 
+             theta1 ~ 1, 
+             omega2 ~ 1, 
+             theta2 ~ 1, 
+             p ~ 1,
+             nl = TRUE)
+
+prior <- c(prior(normal(1000, 1000), 
+                 nlpar = "TY"),
+           prior(normal(1, 2), 
+                 nlpar = "omega1"),
+           prior(normal(100, 50), 
+                   nlpar = "theta1"),
+           prior(normal(1, 2), 
+                   nlpar = "omega2"),
+           prior(normal(300, 30), 
+                   nlpar = "theta2"),
+           prior(normal(.5, .1),
+                   nlpar = "p")
+           )
+```
+
+```{r}
+fit1 <- brm(formula = form, 
+            data = Counts.df, 
+            family = gaussian(),
+            prior = prior, 
+            chains = 2,
+            iter = 1000,
+            control = list(adapt_delta = .9))
+```
