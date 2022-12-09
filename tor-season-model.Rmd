@@ -67,14 +67,15 @@ Counts.df <- Torn.sf |>
                 Month = lubridate::month(Date),
                 Year = lubridate::year(Date),
                 D = lubridate::yday(Date),
-                YearC = Year - 2006,
+                YearC = Year - 1991,
                 DF = as.factor(D)) |>
-  dplyr::group_by(Year, D, .drop = FALSE) |>
+  dplyr::group_by(YearC, D, .drop = FALSE) |>
   dplyr::summarise(nT = dplyr::n()) |>
-  dplyr::group_by(Year) |>
+  dplyr::group_by(YearC) |>
   dplyr::mutate(C = cumsum(nT),
                 nT = nT,
-                TY = dplyr::last(C))
+                TY = dplyr::last(C),
+                Df = D / 365)
 ```
 
 Here I model the cumulative number of tornadoes starting on January 1st for different years. The model is:
@@ -153,10 +154,10 @@ plot(x, y)
 ```
 
 ```{r}
-x <- 1:365
-theta1 <- 100 # where in time the inflection point occurs
+x <- 1:365 / 365
+theta1 <- 100 /365 # where in time the inflection point occurs
 omega1 <- 5
-theta2 <- 300
+theta2 <- 300/365
 omega2 <- 20
 p <- .75
 TY <- 1000
@@ -165,13 +166,13 @@ y <- TY * (p * (1 - exp(-(x / theta1)^omega1)) +
 plot(x, y)
 ```
 ```{r}
-form <- bf( C ~ TY * (p * (1 - exp(-(D / theta1)^omega1)) + 
-                     ((1-p) * (1 - exp(-(D / theta2)^omega2)))),
-             TY ~ 1 + (1 | Year), 
+form <- bf( C ~ TY * (p * (1 - exp(-(Df / theta1)^omega1)) + 
+                     ((1 - p) * (1 - exp(-(Df / theta2)^omega2)))),
+             TY ~ 1 + (1 | YearC), 
              omega1 ~ 1, 
-             theta1 ~ 1, 
+             theta1 ~ (1 | YearC), 
              omega2 ~ 1, 
-             theta2 ~ 1, 
+             theta2 ~ (1 | YearC), 
              p ~ 1,
              nl = TRUE)
 
@@ -179,13 +180,13 @@ prior <- c(prior(normal(1000, 1000),
                  nlpar = "TY"),
            prior(normal(1, 2), 
                  nlpar = "omega1"),
-           prior(normal(100, 50), 
+           prior(normal(.25, .1), 
                    nlpar = "theta1"),
            prior(normal(1, 2), 
                    nlpar = "omega2"),
-           prior(normal(300, 30), 
+           prior(normal(.67, .1), 
                    nlpar = "theta2"),
-           prior(normal(.5, .1),
+           prior(beta(2, 2), lb = 0, ub = 1,
                    nlpar = "p")
            )
 ```
@@ -196,6 +197,29 @@ fit1 <- brm(formula = form,
             family = gaussian(),
             prior = prior, 
             chains = 2,
-            iter = 1000,
-            control = list(adapt_delta = .9))
+            iter = 2000,
+            control = list(adapt_delta = .95,
+                           max_treedepth = 15))
+```
+
+```{r}
+conditional_effects(fit1)
+```
+
+We can also visualize the cumulative number of tornadoes separately for each year.
+
+```{r}
+
+conditions <- data.frame(YearC = unique(Counts.df$YearC))
+rownames(conditions) <- unique(Counts.df$YearC)
+
+conditions <- conditions |>
+  dplyr::filter(YearC >= 21)
+
+me_year <- conditional_effects(fit1, 
+                               conditions = conditions,
+                               re_formula = NULL, 
+                               method = "predict")
+
+plot(me_year, ncol = 5, points = TRUE)
 ```
