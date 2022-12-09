@@ -61,13 +61,13 @@ Model the cumulative distribution directly (see Example 3: Insured loss payments
 ```{r}
 Counts.df <- Torn.sf |>
   sf::st_drop_geometry() |>
-  dplyr::filter(yr >= 1992,
+  dplyr::filter(yr >= 2002,
                 mag >= 0) |>
   dplyr::mutate(Date = lubridate::as_date(date),
                 Month = lubridate::month(Date),
                 Year = lubridate::year(Date),
                 D = lubridate::yday(Date),
-                YearC = Year - 1991,
+                YearC = Year - 2007,
                 DF = as.factor(D)) |>
   dplyr::group_by(YearC, D, .drop = FALSE) |>
   dplyr::summarise(nT = dplyr::n()) |>
@@ -165,14 +165,16 @@ y <- TY * (p * (1 - exp(-(x / theta1)^omega1)) +
           (1 - p) * (1 - exp(-(x / theta2)^omega2)))
 plot(x, y)
 ```
+
+
 ```{r}
 form <- bf( C ~ TY * (p * (1 - exp(-(Df / theta1)^omega1)) + 
                      ((1 - p) * (1 - exp(-(Df / theta2)^omega2)))),
-             TY ~ 1 + (1 | YearC), 
+             TY ~ 1, 
              omega1 ~ 1, 
-             theta1 ~ (1 | YearC), 
+             theta1 ~ 1, 
              omega2 ~ 1, 
-             theta2 ~ (1 | YearC), 
+             theta2 ~ 1, 
              p ~ 1,
              nl = TRUE)
 
@@ -197,9 +199,9 @@ fit1 <- brm(formula = form,
             family = gaussian(),
             prior = prior, 
             chains = 2,
-            iter = 2000,
-            control = list(adapt_delta = .95,
-                           max_treedepth = 15))
+            iter = 4000,
+            control = list(adapt_delta = .9,
+                           max_treedepth = 10))
 ```
 
 ```{r}
