@@ -155,12 +155,12 @@ plot(x, y)
 
 ```{r}
 x <- 1:365 / 365
-theta1 <- 100 /365 # where in time the inflection point occurs
+theta1 <- .4 # where in time the inflection point occurs
 omega1 <- 5
-theta2 <- 300/365
-omega2 <- 20
-p <- .75
-TY <- 1000
+theta2 <- .65
+omega2 <- 2
+p <- .32
+TY <- 1292
 y <- TY * (p * (1 - exp(-(x / theta1)^omega1)) + 
           (1 - p) * (1 - exp(-(x / theta2)^omega2)))
 plot(x, y)
@@ -215,13 +215,47 @@ We can also visualize the cumulative number of tornadoes separately for each yea
 conditions <- data.frame(YearC = unique(Counts.df$YearC))
 rownames(conditions) <- unique(Counts.df$YearC)
 
-conditions <- conditions |>
-  dplyr::filter(YearC >= 21)
-
 me_year <- conditional_effects(fit1, 
                                conditions = conditions,
                                re_formula = NULL, 
                                method = "predict")
 
 plot(me_year, ncol = 5, points = TRUE)
+```
+
+```{r}
+form <- bf( C ~ TY * (p * (1 - exp(-(Df / theta1)^omega1)) + 
+                     ((1 - p) * (1 - exp(-(Df / theta2)^omega2)))),
+             TY ~ 1, 
+             omega1 ~ 1, 
+             theta1 ~ 1, 
+             omega2 ~ 1, 
+             theta2 ~ 1, 
+             p ~ 1 + (1 | YearC),
+             nl = TRUE)
+
+prior <- c(prior(normal(1000, 1000), 
+                 nlpar = "TY"),
+           prior(normal(1, 2), 
+                 nlpar = "omega1"),
+           prior(normal(.25, .1), 
+                   nlpar = "theta1"),
+           prior(normal(1, 2), 
+                   nlpar = "omega2"),
+           prior(normal(.67, .1), 
+                   nlpar = "theta2"),
+           prior(beta(2, 2), lb = 0, ub = 1,
+                   nlpar = "p")
+           )
+```
+
+```{r}
+fit1 <- brm(formula = form, 
+            data = Counts.df, 
+            family = gaussian(),
+            prior = prior, 
+            chains = 2,
+            iter = 4000,
+            control = list(adapt_delta = .9,
+                           max_treedepth = 10))
 ```
