@@ -4,6 +4,8 @@ output: html_document
 date: "2022-12-03"
 ---
 
+STAN is a probabilistic programming language for performing Bayesian inference. It is used to estimate the posterior distribution of model parameters given a set of observed data. STAN is designed to be highly efficient and to handle models with complex structures, such as hierarchical models and models with large numbers of parameters. It is implemented as a compiled language, which means that STAN programs are translated into machine code and run directly on the computer's processor. This makes STAN programs very fast and efficient. In addition, STAN uses automatic differentiation to compute gradients, which makes it easier to implement and optimize complex models. Overall, STAN is a powerful tool for performing Bayesian inference and can be used for a wide range of applications in statistics, machine learning, and other fields.
+
 Download the data and put it into the folder called `data`
 
 ```{r}
