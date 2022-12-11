@@ -228,12 +228,12 @@ plot(me_year, ncol = 5, points = TRUE)
 ```{r}
 form <- bf( C ~ TY * (p * (1 - exp(-(Df / theta1)^omega1)) + 
                      ((1 - p) * (1 - exp(-(Df / theta2)^omega2)))),
-             TY ~ 1, 
+             TY ~ 1 + (1 | YearC), 
              omega1 ~ 1, 
              theta1 ~ 1, 
              omega2 ~ 1, 
              theta2 ~ 1, 
-             p ~ 1 + (1 | YearC),
+             p ~ 1,
              nl = TRUE)
 
 prior <- c(prior(normal(1000, 1000), 
@@ -252,7 +252,7 @@ prior <- c(prior(normal(1000, 1000),
 ```
 
 ```{r}
-fit1 <- brm(formula = form, 
+fit2 <- brm(formula = form, 
             data = Counts.df, 
             family = gaussian(),
             prior = prior, 
@@ -260,4 +260,63 @@ fit1 <- brm(formula = form,
             iter = 4000,
             control = list(adapt_delta = .9,
                            max_treedepth = 10))
+```
+
+```{r}
+conditional_effects(fit2)
+
+conditions <- data.frame(YearC = unique(Counts.df$YearC))
+rownames(conditions) <- unique(Counts.df$YearC)
+
+me_year <- conditional_effects(fit2, 
+                               conditions = conditions,
+                               re_formula = NULL, 
+                               method = "predict")
+
+plot(me_year, ncol = 5, points = TRUE)
+```
+
+```{r}
+form <- bf( C ~ TY * (p * (1 - exp(-(Df / theta1)^omega1)) + 
+                     ((1 - p) * (1 - exp(-(Df / theta1)^omega1)))),
+             TY ~ 1 + (1 | YearC), 
+             omega1 ~ 1 + (1 | YearC), 
+             theta1 ~ 1, 
+             p ~ 1,
+             nl = TRUE)
+
+prior <- c(prior(normal(1000, 1000), 
+                 nlpar = "TY"),
+           prior(normal(1, 2), 
+                 nlpar = "omega1"),
+           prior(normal(.25, .1), 
+                   nlpar = "theta1"),
+           prior(beta(2, 2), lb = 0, ub = 1,
+                   nlpar = "p")
+           )
+```
+
+```{r}
+fit3 <- brm(formula = form, 
+            data = Counts.df, 
+            family = gaussian(),
+            prior = prior, 
+            chains = 2,
+            iter = 4000,
+            control = list(adapt_delta = .9,
+                           max_treedepth = 13))
+```
+
+```{r}
+conditional_effects(fit3)
+
+conditions <- data.frame(YearC = unique(Counts.df$YearC))
+rownames(conditions) <- unique(Counts.df$YearC)
+
+me_year <- conditional_effects(fit3, 
+                               conditions = conditions,
+                               re_formula = NULL, 
+                               method = "predict")
+
+plot(me_year, ncol = 5, points = TRUE)
 ```
