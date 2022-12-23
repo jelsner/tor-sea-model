@@ -33,27 +33,29 @@ Filter and augment the data frame. Make sure to center the variables
 ```{r}
 Counts.df <- Torn.sf |>
   sf::st_drop_geometry() |>
-  dplyr::filter(yr >= 1992,
-                mag >= 0) |>
+  dplyr::filter(yr >= 2002,
+                mag >= 1) |>
   dplyr::mutate(Date = lubridate::as_date(date),
                 Month = lubridate::month(Date),
                 Year = lubridate::year(Date),
-                DoY = lubridate::yday(Date),
-                YearC = Year - 2006,
-                MonthC = Month - 6,
-                DoYC = DoY - 182) |>
-  dplyr::group_by(YearC, DoYC) |>
-  dplyr::summarise(nT = dplyr::n())
+                D = factor(lubridate::yday(Date), levels = 1:366)) |>
+  dplyr::group_by(Year, D, .drop = FALSE) |>
+  dplyr::summarise(nT = dplyr::n()) |>
+  dplyr::mutate(DN = (as.integer(D) - 183),
+                YearN = (Year - 2007))
 ```
 
 Model
 
 ```{r}
-f <- nT ~ YearC * DoYC
+library(brms)
+
+f <- nT ~ 1 + D
 
 fit0 <- brms::brm(f, data = Counts.df, 
                   family = negbinomial(link = "log", 
-                                       link_shape = "log"))
+                                       link_shape = "log"),
+                  chains = 2)
 
 pp_check(fit0)
 ```
@@ -63,21 +65,39 @@ Model the cumulative distribution directly (see Example 3: Insured loss payments
 ```{r}
 Counts.df <- Torn.sf |>
   sf::st_drop_geometry() |>
-  dplyr::filter(yr >= 2002,
+  dplyr::filter(yr >= 2000, yr < 2004,
                 mag >= 0) |>
   dplyr::mutate(Date = lubridate::as_date(date),
                 Month = lubridate::month(Date),
                 Year = lubridate::year(Date),
-                D = lubridate::yday(Date),
-                YearC = Year - 2007,
-                DF = as.factor(D)) |>
-  dplyr::group_by(YearC, D, .drop = FALSE) |>
+                D = lubridate::yday(Date)) |>
+  dplyr::group_by(Year, D, .drop = FALSE) |>
   dplyr::summarise(nT = dplyr::n()) |>
-  dplyr::group_by(YearC) |>
+  dplyr::group_by(Year) |>
   dplyr::mutate(C = cumsum(nT),
                 nT = nT,
                 TY = dplyr::last(C),
                 Df = D / 365)
+```
+
+Start with a non-linear least squares
+
+```{r}
+plot(C ~ D, data = Counts.df)
+
+fit <- nls(C ~ SSlogis(D, TY, theta, omega), data = Counts.df)
+summary(fit)
+
+curve(predict(fit, newdata = data.frame(D = x)), add=TRUE)
+```
+
+```{r}
+start.vals <- c(TY = 1000, omega = 31, theta = 151)
+library(nlme)
+w0 <- gnls(C ~ TY * (1 - exp(-(D/theta)^omega)),
+           weights = varPower(fixed=.5),
+           data = Counts.df, start = start.vals)
+w0
 ```
 
 Here I model the cumulative number of tornadoes starting on January 1st for different years. The model is:
